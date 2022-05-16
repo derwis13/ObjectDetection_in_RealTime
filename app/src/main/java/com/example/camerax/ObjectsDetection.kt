@@ -4,22 +4,29 @@ import android.content.Context
 import android.graphics.*
 import android.util.Log
 import com.google.android.odml.image.MlImage
+import org.tensorflow.lite.support.common.FileUtil
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.task.core.vision.ImageProcessingOptions
 import org.tensorflow.lite.task.vision.detector.Detection
 import org.tensorflow.lite.task.vision.detector.ObjectDetector
+import java.util.ArrayList
 
 class ObjectsDetection(context_: Context) {
     private var context:Context = context_
+    //val list= listOf<String>("remote")
     private val options= ObjectDetector.ObjectDetectorOptions.builder()
         .setMaxResults(maxResults)
         .setScoreThreshold(scoreThreshold)
+        //.setLabelAllowList(list)
         .build()
     private val detector= ObjectDetector.createFromFileAndOptions(
         context,
         modelPath,
         options
     )
+    private val lab=FileUtil.loadLabels(context,"labelmap.txt")
+    //private val d=ObjectDetector.
+
     private var orientation:Pair<ImageProcessingOptions.Orientation,Int> =
         Pair(ImageProcessingOptions.Orientation.TOP_LEFT,0)
     private var imageOption=ImageProcessingOptions.builder()
@@ -33,6 +40,8 @@ class ObjectsDetection(context_: Context) {
         private const val modelPath = "model_1.tflite"
         private const val maxResults = 15
         private const val scoreThreshold = 0.5f
+        private val labels= mapOf(Pair(1,"apple"),Pair(81,"tv"))
+
 
         //boundbox
         private lateinit var mutableList: MutableList<Pair<RectF,String>>
@@ -67,18 +76,21 @@ class ObjectsDetection(context_: Context) {
 
         checkOrientation(image.rotation)
 
+
         //TOP_LEFT <-
         //LEFT_BOTTOM ->
 
-
         //img_opt.setOrientation(ImageProcessingOptions.Orientation.LEFT_BOTTOM)
         results=detector.detect(image,imageOption)//img_opt
-
+        //Log.d("index","${lab.withIndex().iterator()}")
         results.map {
+
             val category = it.categories.first()
             //Log.i("detect_TAG","${results.size}")
+            //Log.d("index","${lab[category.index-1]}")
+            //Log.d("index","${labels[category.index]}")
 
-            text = "${category.label}, ${category.score.times(100).toInt()}%"
+            text = "${lab[category.index]}, ${category.score.times(100).toInt()}%"
             rectF=it.boundingBox
             mutableList.add(Pair(rectF, text))
         }
