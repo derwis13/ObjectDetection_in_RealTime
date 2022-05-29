@@ -2,6 +2,7 @@ package com.example.camerax
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.media.Image
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
@@ -14,25 +15,22 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.scale
 import com.example.camerax.databinding.ActivityMainBinding
 import com.example.objectdetectionapp.ObjectsDetection
-import com.google.android.odml.image.BitmapMlImageBuilder
+import org.tensorflow.lite.support.image.TensorImage
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-
 
 open class CameraActivity(): AppCompatActivity() {
 
 
+
     private lateinit var viewBinding: ActivityMainBinding
-
     private lateinit var cameraExecutor: ExecutorService
-
     protected fun viewBinding_(){
-
         ActivityMainBinding.inflate(layoutInflater).also { viewBinding = it }
         setContentView(viewBinding.root)
         Executors.newSingleThreadExecutor().also { cameraExecutor = it }
-
     }
+
     private fun toBitmap(image: Image): Bitmap? {
         val planes = image.planes
         val buffer = planes[0].buffer
@@ -41,29 +39,22 @@ open class CameraActivity(): AppCompatActivity() {
         val rowPadding = rowStride - pixelStride * image.width
         val bitmap = Bitmap.createBitmap(
             image.width + rowPadding / pixelStride,
-            image.height, Bitmap.Config.ARGB_8888
-        )
+            image.height, Bitmap.Config.ARGB_8888)
         bitmap.copyPixelsFromBuffer(buffer)
         return bitmap
     }
 
-    //@SuppressLint("UnsafeOptInUsageError")
     @SuppressLint("UnsafeOptInUsageError")
     protected fun startCamera(objectsDetection: ObjectsDetection) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener({
-            // Used to bind the lifecycle of cameras to the lifecycle owner
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
-
             val preview = Preview.Builder()
                 .build()
                 .also {
                     it.setSurfaceProvider(viewBinding.viewFinder.surfaceProvider)
                 }
-
-
-            // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             val imageAnalysis = ImageAnalysis.Builder()
@@ -76,18 +67,18 @@ open class CameraActivity(): AppCompatActivity() {
 
                         try {
                             if (it.image!=null) {
-                                var bitmap=toBitmap(it.image!!)!!.scale(viewBinding.imageView.width,viewBinding.imageView.height)
+                                var bitmap=toBitmap(it.image!!)
+                                bitmap= bitmap?.let { it -> rotateBitmap(it,rotationDegrees.toFloat()) }
+                                bitmap=bitmap!!.scale(viewBinding.imageView.width,viewBinding.imageView.height)
 
-                                BitmapMlImageBuilder(bitmap!!)
-                                    .setRotation(rotationDegrees)
-                                    .build()
+                                TensorImage.fromBitmap(bitmap!!)
                                     .also {
-                                        objectsDetection.runObjectDetection(it)
-                                    }
-                                //objectsDetection.debugPrint()
-                                val bitmap1=objectsDetection.drawBoundingBoxWithText(bitmap!!)
+                                        objectsDetection.runObjectDetection(it) }
 
-                                viewBinding.imageView.setImageBitmap(bitmap1)
+                                objectsDetection.debugPrint()
+                                bitmap=objectsDetection.drawBoundingBoxWithText(bitmap!!)
+
+                                viewBinding.imageView.setImageBitmap(bitmap)
                             }
                         }catch (exc: Exception){
                             Log.e("ObjectDetection","Fail detect objects on image",exc)
@@ -98,14 +89,16 @@ open class CameraActivity(): AppCompatActivity() {
 
             try {
                 cameraProvider.unbindAll()
-
                 cameraProvider.bindToLifecycle(this, cameraSelector, preview,imageAnalysis)
-
             } catch(exc: Exception) {
                 Log.e(CameraActivity.TAG, "Use case binding failed", exc)
             }
-
         }, ContextCompat.getMainExecutor(this))
+    }
+    fun rotateBitmap(source: Bitmap, angle: Float): Bitmap? {
+        val matrix = Matrix()
+        matrix.postRotate(angle)
+        return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
     }
 
     override fun onDestroy() {

@@ -14,7 +14,6 @@ import androidx.appcompat.app.AppCompatActivity
 import com.example.objectdetectionapp.ObjectsDetection
 
 class MainActivity : CameraActivity() {
-    //var camera:CameraActivity=CameraActivity(this)
     private lateinit var objectsDetection: ObjectsDetection
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,9 +36,7 @@ class MainActivity : CameraActivity() {
             )
         }
         //viewBinding.imageView.setImageBitmap(Bitmap.createBitmap(100,100,Bitmap.Config.ARGB_8888))
-        }
-
-
+    }
 
     override fun onRequestPermissionsResult(
         requestCode: Int, permissions: Array<String>, grantResults:
