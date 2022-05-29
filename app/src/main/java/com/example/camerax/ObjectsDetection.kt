@@ -43,7 +43,7 @@ class ObjectsDetection(context: Context) {
     }
 
     fun runObjectDetection(image: MlImage) {
-
+        mutableList= mutableListOf()
         results=detector.detect(image)
         results.map {
             val category = it.categories.first()
@@ -53,7 +53,7 @@ class ObjectsDetection(context: Context) {
         }
     }
     fun runObjectDetection(image: TensorImage) {
-
+        mutableList= mutableListOf()
         results=detector.detect(image)
 
         results.map {

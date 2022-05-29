@@ -61,24 +61,23 @@ open class CameraActivity(): AppCompatActivity() {
                 .setOutputImageFormat(OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
-                .also {
-                    it.setAnalyzer(cameraExecutor, ImageAnalysis.Analyzer {
+                .also { it ->
+                    it.setAnalyzer(cameraExecutor, ImageAnalysis.Analyzer { it ->
                         val rotationDegrees = it.imageInfo.rotationDegrees
 
                         try {
                             if (it.image!=null) {
-                                var bitmap=toBitmap(it.image!!)
-                                bitmap= bitmap?.let { it -> rotateBitmap(it,rotationDegrees.toFloat()) }
-                                bitmap=bitmap!!.scale(viewBinding.imageView.width,viewBinding.imageView.height)
+                                val bitmap=toBitmap(it.image!!)!!.let {
+                                    rotateBitmap(it,rotationDegrees.toFloat()).let {it1->
+                                        it1!!.scale(viewBinding.imageView.width,viewBinding.imageView.height)
+                                    }
+                                }
+                                TensorImage.fromBitmap(bitmap).let {
+                                    objectsDetection.runObjectDetection(it)}
 
-                                TensorImage.fromBitmap(bitmap!!)
-                                    .also {
-                                        objectsDetection.runObjectDetection(it) }
-
-                                objectsDetection.debugPrint()
-                                bitmap=objectsDetection.drawBoundingBoxWithText(bitmap!!)
-
-                                viewBinding.imageView.setImageBitmap(bitmap)
+                                //objectsDetection.debugPrint()
+                                this@CameraActivity.runOnUiThread(Runnable {
+                                    this.viewBinding.imageView.setImageBitmap(objectsDetection.drawBoundingBoxWithText(bitmap)) })
                             }
                         }catch (exc: Exception){
                             Log.e("ObjectDetection","Fail detect objects on image",exc)
@@ -106,8 +105,8 @@ open class CameraActivity(): AppCompatActivity() {
         cameraExecutor.shutdown()
     }
 
+
     companion object {
         private const val TAG = "CameraXApp"
     }
-
 }
