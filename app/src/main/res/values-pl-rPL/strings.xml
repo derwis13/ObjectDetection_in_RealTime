@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="language">Język</string>
+    <string name="scoreThreshold">Próg \nwykrycia</string>
+    <string name="bndboxStrokeWidth">Szarokość obrysu \nobramowania</string>
+    <string name="resultsTextSize">Rozmiar wyniku</string>
+    <string name="maxDetecionsResult">Max ilość \nwyników detekcji</string>
+    <string name="startAppButton">Start</string>
+    <string name="settingsButton">Ustawienia</string>
+    <string name="saveSettingButtonValue">Zapisz ustawienia</string>
+</resources>

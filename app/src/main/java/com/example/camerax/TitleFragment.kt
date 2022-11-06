@@ -1,24 +1,31 @@
 package com.example.camerax
 
-
+import android.content.Intent
 import android.os.Bundle
-import androidx.fragment.app.Fragment
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.databinding.DataBindingUtil
-import com.example.camerax.R
-//import com.example.android.navigation.databinding.FragmentTitleBinding
+import android.widget.AdapterView
+import androidx.fragment.app.Fragment
+import androidx.navigation.findNavController
+import com.example.camerax.databinding.FragmentTitleBinding
 
 class TitleFragment : Fragment() {
-
+    private lateinit var binding: FragmentTitleBinding
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?): View? {
-        // Inflate the layout for this fragment
-        //val binding= DataBindingUtil.inflate<FragmentTitleBinding>(inflater,
-         //   R.layout.fragment_title,container,false)
-        //return binding.root
-        return null;
+        FragmentTitleBinding.inflate(layoutInflater).also { binding=it}
+        binding.startAppButton.setOnClickListener {
+            val intent = Intent(this.requireContext(), CameraActivity::class.java)
+            intent.putExtra("name", floatArrayOf(0.2f,30f,10f,50f))
+            startActivity(intent)
+        }
+        binding.settingsButton.setOnClickListener{
+                view:View ->view.findNavController()
+            .navigate(R.id.action_titleFragment_to_settingsFragment)}
+
+        return binding.root
     }
 }

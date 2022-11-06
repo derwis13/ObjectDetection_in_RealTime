@@ -1,34 +1,84 @@
 package com.example.camerax
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.graphics.Point
 import android.media.Image
+import android.os.Build
+import android.os.Bundle
 import android.util.Log
+import android.view.Display
+import android.view.WindowManager
+import android.widget.ImageView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.scale
-import com.example.camerax.databinding.ActivityMainBinding
+import com.example.camerax.databinding.CameraLayoutBinding
 import com.example.objectdetectionapp.ObjectsDetection
 import org.tensorflow.lite.support.image.TensorImage
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-open class CameraActivity(): AppCompatActivity() {
 
-
-
-    private lateinit var viewBinding: ActivityMainBinding
+class CameraActivity(): AppCompatActivity() {
+    private lateinit var objectsDetection: ObjectsDetection
+    private lateinit var viewBinding: CameraLayoutBinding
     private lateinit var cameraExecutor: ExecutorService
-    protected fun viewBinding_(){
-        ActivityMainBinding.inflate(layoutInflater).also { viewBinding = it }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        CameraLayoutBinding.inflate(layoutInflater).also { viewBinding=it}
         setContentView(viewBinding.root)
-        Executors.newSingleThreadExecutor().also { cameraExecutor = it }
+        Executors.newSingleThreadExecutor().also {cameraExecutor = it }
+
+        val intent = intent
+        val floatarray=intent.getFloatArrayExtra("name")
+        objectsDetection=ObjectsDetection(this,
+                floatarray!!.component1(),
+                floatarray!!.component2().toInt(),
+                floatarray!!.component3(),
+                floatarray!!.component4())
+
+        if (allPermissionsGranted()) {
+            startCamera(objectsDetection)
+
+        } else {
+            ActivityCompat.requestPermissions(
+                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS
+            )
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<String>, grantResults:
+        IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_CODE_PERMISSIONS) {
+            if (allPermissionsGranted()) {
+                startCamera(objectsDetection)
+            } else {
+                Toast.makeText(this,
+                    "Permissions not granted by the user.",
+                    Toast.LENGTH_SHORT).show()
+                finish()
+            }
+        }
+    }
+
+    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
+        ContextCompat.checkSelfPermission(
+            baseContext, it) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun toBitmap(image: Image): Bitmap? {
@@ -55,6 +105,7 @@ open class CameraActivity(): AppCompatActivity() {
                 .also {
                     it.setSurfaceProvider(viewBinding.viewFinder.surfaceProvider)
                 }
+
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             val imageAnalysis = ImageAnalysis.Builder()
@@ -67,17 +118,19 @@ open class CameraActivity(): AppCompatActivity() {
 
                         try {
                             if (it.image!=null) {
-                                val bitmap=toBitmap(it.image!!)!!.let {
-                                    rotateBitmap(it,rotationDegrees.toFloat()).let {it1->
+                                val bitmap=toBitmap(it.image!!).let {
+                                    rotateBitmap(it!!,rotationDegrees.toFloat()).let { it1 ->
                                         it1!!.scale(viewBinding.imageView.width,viewBinding.imageView.height)
                                     }
                                 }
-                                TensorImage.fromBitmap(bitmap).let {
-                                    objectsDetection.runObjectDetection(it)}
+                                TensorImage.fromBitmap(bitmap).also {
+                                        objectsDetection.runObjectDetection(it)}
 
-                                //objectsDetection.debugPrint()
+                                objectsDetection.debugPrint()
+
                                 this@CameraActivity.runOnUiThread(Runnable {
-                                    this.viewBinding.imageView.setImageBitmap(objectsDetection.drawBoundingBoxWithText(bitmap)) })
+                                    this.viewBinding.imageView.scaleType=ImageView.ScaleType.CENTER
+                                    this.viewBinding.imageView.setImageBitmap(objectsDetection.drawBoundingBoxWithText(bitmap))})
                             }
                         }catch (exc: Exception){
                             Log.e("ObjectDetection","Fail detect objects on image",exc)
@@ -104,9 +157,16 @@ open class CameraActivity(): AppCompatActivity() {
         super.onDestroy()
         cameraExecutor.shutdown()
     }
-
-
     companion object {
         private const val TAG = "CameraXApp"
+        private const val REQUEST_CODE_PERMISSIONS = 10
+        private val REQUIRED_PERMISSIONS =
+            mutableListOf (
+                Manifest.permission.CAMERA
+            ).apply {
+                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                    add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                }
+            }.toTypedArray()
     }
 }

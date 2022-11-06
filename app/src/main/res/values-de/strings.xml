@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="language">Sprache</string>
+    <string name="scoreThreshold">Punkte \nSchwellenwert</string>
+    <string name="bndboxStrokeWidth">Breite des \nBoundbox-Strichs</string>
+    <string name="resultsTextSize">Textgröße der \nErgebnisse</string>
+    <string name="maxDetecionsResult">Ergebnis der \nmaximalen \nErkennungen</string>
+    <string name="startAppButton">App Starten</string>
+    <string name="settingsButton">Einstellungen</string>
+    <string name="saveSettingButtonValue">Einstellungen \nspeichern</string>
+</resources>
