@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "573038061407",
+    "project_id": "objectdetection-in-realtime",
+    "storage_bucket": "objectdetection-in-realtime.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:573038061407:android:5eba08c11d635de9ecb8ea",
+        "android_client_info": {
+          "package_name": "com.example.ObjectDetection_in_RealTime"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "573038061407-62sbe5sv9arpgc0ku74tvpe2hm717rv2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDz18Rj7rqQFYMtVJ_NsqySs41RAtFQOk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "573038061407-62sbe5sv9arpgc0ku74tvpe2hm717rv2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -8,5 +8,6 @@
     <string name="startAppButton">Start App</string>
     <string name="settingsButton">Settings</string>
     <string name="saveSettingButtonValue">save settings</string>
+    <string name="take_photo" translatable="false">Take Photo</string>
 
 </resources>
