@@ -2,26 +2,15 @@ package com.example.camerax
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.content.ContentValues
-import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Matrix
-import android.graphics.Point
-import android.graphics.drawable.BitmapDrawable
-import android.graphics.drawable.Drawable
 import android.location.Location
 import android.media.Image
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
-import android.provider.MediaStore
+import android.os.Looper
 import android.util.Log
-import android.view.Display
-import android.view.View
-import android.view.ViewOverlay
-import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -33,11 +22,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.scale
 import com.example.camerax.databinding.CameraLayoutBinding
 import com.example.objectdetectionapp.ObjectsDetection
-import com.google.firebase.FirebaseApp
+import com.google.android.gms.location.*
 import org.tensorflow.lite.support.image.TensorImage
-import java.io.File
-import java.io.FileNotFoundException
-import java.io.FileOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -47,15 +33,25 @@ class CameraActivity(): AppCompatActivity() {
     private lateinit var objectsDetection: ObjectsDetection
     private lateinit var viewBinding: CameraLayoutBinding
     private lateinit var cameraExecutor: ExecutorService
-    //private lateinit var outputStream: FileOutputStream
     private var imageCapture: ImageCapture? = null
 
+    private lateinit var dataSave:DataSave
+    private lateinit var locationService:LocationService
+
+
+    @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         CameraLayoutBinding.inflate(layoutInflater).also { viewBinding=it}
         setContentView(viewBinding.root)
         Executors.newSingleThreadExecutor().also {cameraExecutor = it }
+
+        locationService=LocationService(applicationContext)
+        dataSave= DataSave(applicationContext)
+        CloudConnection(applicationContext).download()
+
+
 
         val intent = intent
         val floatarray=intent.getFloatArrayExtra("name")
@@ -66,6 +62,7 @@ class CameraActivity(): AppCompatActivity() {
                 floatarray!!.component4())
 
         if (allPermissionsGranted()) {
+            locationService.requestLocationUpdates()
             startCamera(objectsDetection)
 
         } else {
@@ -132,12 +129,12 @@ class CameraActivity(): AppCompatActivity() {
                 .build()
                 .also { it ->
                     it.setAnalyzer(cameraExecutor, ImageAnalysis.Analyzer { it ->
+
                         val rotationDegrees = it.imageInfo.rotationDegrees
-
-
+                        //detect object on image
                         try {
                             if (it.image!=null) {
-                                var bitmap=toBitmap(it.image!!).let {
+                                val bitmap=toBitmap(it.image!!).let {
                                     rotateBitmap(it!!,rotationDegrees.toFloat()).let { it1 ->
                                         it1!!.scale(viewBinding.imageView.width,viewBinding.imageView.height)
                                     }
@@ -147,24 +144,16 @@ class CameraActivity(): AppCompatActivity() {
 
 
                                 objectsDetection.debugPrint()
-                                bitmap=objectsDetection.drawBoundingBoxWithText(bitmap)
-                                viewBinding.imageCaptureButton.setOnClickListener {
 
-                                    DataSave(applicationContext).let {
-                                        it.saveBitmapAsJPEG(bitmap)
-                                        Log.d("Uri_d","${it.getUri()}")
-                                        it.getUri()?.let { CloudConnection(applicationContext).upload(it,"bounded_images/") }
-                                    }
+                                val boundedBitmap=objectsDetection.drawBoundingBoxWithText(bitmap.copy(Bitmap.Config.ARGB_8888,true))
 
-                                    //ataSave(applicationContext).saveBitmapAsJPEG(bitmap)
-                                    //cloudConnection.upload(DataSave(applicationContext).getUri()!!)
-                                    //CloudConnection(applicationContext).upload(DataSave(applicationContext).getUri()!!)
 
-                                }
+                                //on Click button
+                                viewBinding.imageCaptureButton.setOnClickListener { imageCaptureButton(boundedBitmap,bitmap)}
 
                                 this@CameraActivity.runOnUiThread(Runnable {
                                     this.viewBinding.imageView.scaleType=ImageView.ScaleType.CENTER
-                                    this.viewBinding.imageView.setImageBitmap(bitmap)
+                                    this.viewBinding.imageView.setImageBitmap(boundedBitmap)
 
                                 })
                             }
@@ -235,6 +224,50 @@ class CameraActivity(): AppCompatActivity() {
 //            }
 //        )
 //    }
+    @SuppressLint("MissingPermission")
+    fun imageCaptureButton(boundedBitmap: Bitmap,bitmap: Bitmap){
+        //get location of device with 0.01m precision [7 decimal places]
+        locationService.getLastLocation()
+            .addOnSuccessListener { location: Location ->
+                Log.d("Location_tag", "$location")
+                for (i in 0..objectsDetection.getCountOfResults()-1) {
+                    val result=objectsDetection.getResult(i)
+
+                    dataSave.writeFileExternalStorage(
+                    "${dataSave.getNameFile()}.jpg;"+
+                            "${result.boundingBox.left};"+
+                            "${result.boundingBox.top};"+
+                            "${result.boundingBox.right};"+
+                            "${result.boundingBox.bottom};"+
+                            "${result.categories.first().index};"+
+                            "${result.categories.first().score};"+
+                            "${location.latitude};"+
+                            "${location.longitude};"+
+                            "${location.altitude}\n",
+                    "annotations_images")
+                    Log.d("Uri_d", "$location")
+                }
+                dataSave.getUri()?.let {
+                    CloudConnection(applicationContext).upload(it,"annotation/","annotations_images.txt")
+                }
+            }
+        //upload annotation
+        Log.d("Uri_d", "${dataSave.getUri()}")
+
+        //upload bounded image
+        dataSave.saveBitmapAsJPEG(boundedBitmap)
+        dataSave.getUri()?.let {
+            CloudConnection(applicationContext).upload(
+                it, "bounded_images/", dataSave.getNameFile())
+        }
+        //upload image
+        dataSave.saveBitmapAsJPEG(bitmap)
+        dataSave.getUri()?.let {
+        CloudConnection(applicationContext).upload(
+            it, "images/", dataSave.getNameFile())
+        }
+        dataSave.readFile("annotation_image")
+    }
     fun rotateBitmap(source: Bitmap, angle: Float): Bitmap? {
         val matrix = Matrix()
         matrix.postRotate(angle)
@@ -246,12 +279,14 @@ class CameraActivity(): AppCompatActivity() {
         cameraExecutor.shutdown()
     }
     companion object {
-        private const val TAG = "CameraXApp"
+        private const val TAG = "ObjectDetectionApp"
         private const val REQUEST_CODE_PERMISSIONS = 10
         private val REQUIRED_PERMISSIONS =
             mutableListOf (
                 Manifest.permission.CAMERA,
-                Manifest.permission.READ_EXTERNAL_STORAGE
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+                Manifest.permission.ACCESS_FINE_LOCATION
 
             ).apply {
                 if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {

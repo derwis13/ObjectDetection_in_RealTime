@@ -17,7 +17,9 @@ import com.google.firebase.storage.StorageReference
 import com.google.firebase.storage.ktx.storage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import java.io.File
 import java.lang.Exception
 import java.util.*
 
@@ -37,7 +39,7 @@ class CloudConnection(context: Context) {
 //    }
     fun download() {
         storageReference=FirebaseStorage.getInstance().reference
-        val ref=storageReference.child("star.png")
+        val ref=storageReference.child("annotation/annotations_images.txt")
 //        ref.downloadUrl.addOnSuccessListener(OnSuccessListener {
 //            fun onSuccess(uri: Uri){
 //                downloadFiles()
@@ -48,32 +50,37 @@ class CloudConnection(context: Context) {
 //            }
 //        })
         ref.downloadUrl.addOnSuccessListener{
-            downloadfiles(context,"star",".png",DIRECTORY_DOWNLOADS,it.toString())
+            downloadfiles("annotations_images",".txt",
+                "/annotations/",it.toString())
+            Toast.makeText(context,"SUCCESS DOWNLOAD",Toast.LENGTH_LONG).show()
         }.addOnFailureListener {
 
         }
 
         }
-    fun downloadfiles(context: Context, filename:String, fileExtension:String, destinationDirectory:String, url:String){
+    fun downloadfiles(filename:String, fileExtension:String, destinationDirectory:String, url:String){
         val downloadManager:DownloadManager=context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val uri:Uri=Uri.parse(url)
         val request:DownloadManager.Request=DownloadManager.Request(uri)
         request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+        val file=File(context.getExternalFilesDir(null)!!.absolutePath+"/annotations/","annotations_images.txt")
+        if(file.exists())
+            file.delete()
         request.setDestinationInExternalFilesDir(context, destinationDirectory,filename+fileExtension)
         downloadManager.enqueue(request)
     }
-    fun upload(imageUri: Uri, cloudPath:String)= CoroutineScope(Dispatchers.IO).launch{
+    fun upload(imageUri: Uri, cloudPath:String, filename:String)= CoroutineScope(Dispatchers.IO).launch{
 
         val storageReference=FirebaseStorage.getInstance().reference
-        val randomKey= UUID.randomUUID().toString()
-        val mountainsRef = storageReference.child(cloudPath+randomKey)
+        //val randomKey= UUID.randomUUID().toString()
+        val mountainsRef = storageReference.child(cloudPath+filename)
         mountainsRef.putFile(imageUri).addOnSuccessListener {
             //pd.dismiss()
         }.addOnFailureListener {
             //pd.dismiss()
         }
             .addOnProgressListener {
-                val progressProcent=(100*it.bytesTransferred/it.totalByteCount)
+               // val progressProcent=(100*it.bytesTransferred/it.totalByteCount)
                 //pd.setMessage("Progress: "+progressProcent.toInt() + "%")
 
             }

@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.*
 import android.util.Log
 import android.util.Pair
+import android.util.Size
+import android.util.SizeF
 import androidx.core.graphics.scale
 import com.google.android.odml.image.MlImage
 import org.tensorflow.lite.support.common.FileUtil
@@ -43,10 +45,6 @@ class ObjectsDetection(context: Context,
         //private const val maxResults = 30
         //private const val scoreThreshold = 0.2f
 
-        //boundbox
-        private lateinit var mutableList: MutableList<Pair<RectF, String>>
-        private lateinit var rectF: RectF
-        private lateinit var text: String
 
         private const val boundboxStrokeColor = Color.BLACK
         //private const val textSize = 50f
@@ -54,25 +52,11 @@ class ObjectsDetection(context: Context,
     }
 
     fun runObjectDetection(image: MlImage) {
-        mutableList= mutableListOf()
         results=detector.detect(image)
-        results.map {
-            val category = it.categories.first()
-            text = "${lab[category.index]}, ${category.score.times(100).toInt()}%"
-            rectF=it.boundingBox
-            mutableList.add(Pair(rectF, text))
-        }
+
     }
     fun runObjectDetection(image: TensorImage) {
-        mutableList= mutableListOf()
         results=detector.detect(image)
-        results.map {
-            val category = it.categories.first()
-            text = "${lab[category.index]}, ${category.score.times(100).toInt()}%"
-            rectF= RectF(it.boundingBox.left/image.width,it.boundingBox.top/image.height,
-            it.boundingBox.right/image.width,it.boundingBox.bottom/image.height)
-            mutableList.add(Pair(rectF, text))
-        }
     }
     fun debugPrint() {
 
@@ -90,55 +74,71 @@ class ObjectsDetection(context: Context,
         }
     }
 
-    fun drawBoundingBoxWithText(bitmap1: Bitmap):Bitmap {
+    fun drawBoundingBoxWithText(bitmap: Bitmap):Bitmap {
 
-
-        val bitmap2=Bitmap.createBitmap(bitmap1.width,bitmap1.height,Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap1)
+        //val bitmap2=Bitmap.createBitmap(bitmap1.width,bitmap1.height,Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
 
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
+        for ((i,obj) in results.withIndex()){
+            val box=obj.boundingBox
+            for ((j, category) in obj.categories.withIndex()) {
+                val text = "${lab[category.index]}, ${category.score.times(100).toInt()}%"
 
-        mutableList.forEach{
-            paint.color = boundboxStrokeColor
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = boundboxStrokeWidth
-            canvas.drawRect(it.first.left*bitmap2.width,it.first.top*bitmap2.height,
-                it.first.right*bitmap2.width,it.first.bottom*bitmap2.height,paint)
-            Log.d("wymiary","${it.first.left},${it.first.right}")
+                paint.color = boundboxStrokeColor
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = boundboxStrokeWidth
+                canvas.drawRect(box.left,box.top,
+                    box.right,box.bottom,paint)
 
-            val margin=15f
-            paint.textAlign= Paint.Align.LEFT
-            paint.textSize= textSize
-            paint.style= Paint.Style.FILL
-            paint.getTextBounds(it.second,0,it.second.length, Rect(0,0,0,0))
-            canvas.drawText(it.second,it.first.left*bitmap2.width+margin,it.first.top*bitmap2.height-margin,paint)
+                val margin=15f
+                paint.textAlign= Paint.Align.LEFT
+                paint.textSize= textSize
+                paint.style= Paint.Style.FILL
+                paint.getTextBounds(text,0,text.length, Rect(0,0,0,0))
+                canvas.drawText(text,box.left+margin,box.top-margin,paint)
+
+            }
+
 
         }
 
         //bitmap1.scale(2000,3000)
-        return bitmap1
+        return bitmap
+    }
+    fun getCountOfResults():Int{
+        return results.size
+    }
+    fun getResult(index:Int):Detection {
+        return results[index]
     }
     fun drawBoundingBoxWithText(width:Int,height:Int):Canvas{
         val bitmap=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-        mutableList.forEach{
-            paint.color = boundboxStrokeColor
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = boundboxStrokeWidth
-            canvas.drawRect(it.first.left*bitmap.width,it.first.top*bitmap.height,
-                it.first.right*bitmap.width,it.first.bottom*bitmap.height,paint)
-            Log.d("wymiary","${it.first.left},${it.first.right}")
+        for ((i,obj) in results.withIndex()) {
+            val box = obj.boundingBox
+            for ((j, category) in obj.categories.withIndex()) {
+                val text = "${lab[category.index]}, ${category.score.times(100).toInt()}%"
 
-            val margin=15f
-            paint.textAlign= Paint.Align.LEFT
-            paint.textSize= textSize
-            paint.style= Paint.Style.FILL
-            paint.getTextBounds(it.second,0,it.second.length, Rect(0,0,0,0))
-            canvas.drawText(it.second,it.first.left*bitmap.width+margin,it.first.top*bitmap.height-margin,paint)
+                paint.color = boundboxStrokeColor
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = boundboxStrokeWidth
+                canvas.drawRect(
+                    box.left, box.top,
+                    box.right, box.bottom, paint
+                )
 
+                val margin = 15f
+                paint.textAlign = Paint.Align.LEFT
+                paint.textSize = textSize
+                paint.style = Paint.Style.FILL
+                paint.getTextBounds(text, 0, text.length, Rect(0, 0, 0, 0))
+                canvas.drawText(text, box.left + margin, box.top - margin, paint)
+
+            }
         }
         return canvas
     }
