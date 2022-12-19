@@ -1,17 +1,16 @@
 package com.example.objectdetectionapp
 
+import android.R
 import android.content.Context
 import android.graphics.*
 import android.util.Log
-import android.util.Pair
 import android.util.Size
-import android.util.SizeF
-import androidx.core.graphics.scale
 import com.google.android.odml.image.MlImage
 import org.tensorflow.lite.support.common.FileUtil
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.task.vision.detector.Detection
 import org.tensorflow.lite.task.vision.detector.ObjectDetector
+
 
 class ObjectsDetection(context: Context,
                        scoreThreshold_:Float,
@@ -53,8 +52,8 @@ class ObjectsDetection(context: Context,
 
     fun runObjectDetection(image: MlImage) {
         results=detector.detect(image)
-
     }
+
     fun runObjectDetection(image: TensorImage) {
         results=detector.detect(image)
     }
@@ -73,10 +72,42 @@ class ObjectsDetection(context: Context,
             }
         }
     }
+    fun scaleResultBoundBox(scale:Float){
+        results.forEach {
+            it.boundingBox.bottom=it.boundingBox.bottom*scale
+            it.boundingBox.top=it.boundingBox.top*scale
+            it.boundingBox.left=it.boundingBox.left*scale
+            it.boundingBox.right=it.boundingBox.right*scale
+        }
+    }
+    fun scaleResultBoundBox(scale_x:Float,scale_y:Float){
+        results.forEach {
+            it.boundingBox.bottom=it.boundingBox.bottom*scale_y
+            it.boundingBox.top=it.boundingBox.top*scale_y
+            it.boundingBox.left=it.boundingBox.left*scale_x
+            it.boundingBox.right=it.boundingBox.right*scale_x
+        }
+    }
+    fun moveResultBoundBox(x:Float,y:Float) {
+        results.forEach {
+            it.boundingBox.bottom = it.boundingBox.bottom + y
+            it.boundingBox.top = it.boundingBox.top + y
+            it.boundingBox.left = it.boundingBox.left + x
+            it.boundingBox.right = it.boundingBox.right + x
+            when{
+                it.boundingBox.bottom<0.0->it.boundingBox.bottom= 0.0F
+                it.boundingBox.top<0.0->it.boundingBox.top= 0.0F
+                it.boundingBox.right<0.0->it.boundingBox.right= 0.0F
+                it.boundingBox.left<0.0->it.boundingBox.left= 0.0F
+            }
+        }
+    }
 
-    fun drawBoundingBoxWithText(bitmap: Bitmap):Bitmap {
+    fun drawBoundingBoxWithText(size: Size):Bitmap {
 
-        //val bitmap2=Bitmap.createBitmap(bitmap1.width,bitmap1.height,Bitmap.Config.ARGB_8888)
+        val bitmap=Bitmap.createBitmap(size.width,size.height,Bitmap.Config.ARGB_8888)
+
+
         val canvas = Canvas(bitmap)
 
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -98,15 +129,11 @@ class ObjectsDetection(context: Context,
                 paint.style= Paint.Style.FILL
                 paint.getTextBounds(text,0,text.length, Rect(0,0,0,0))
                 canvas.drawText(text,box.left+margin,box.top-margin,paint)
-
             }
-
-
         }
-
-        //bitmap1.scale(2000,3000)
         return bitmap
     }
+
     fun getCountOfResults():Int{
         return results.size
     }

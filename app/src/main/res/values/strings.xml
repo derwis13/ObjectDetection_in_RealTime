@@ -9,5 +9,7 @@
     <string name="settingsButton">Settings</string>
     <string name="saveSettingButtonValue">save settings</string>
     <string name="take_photo" translatable="false">Take Photo</string>
+    <string name="start_capture" translatable="false">Star Capture</string>
+    <string name="stop_capture" translatable="false">Stop Capture</string>
 
 </resources>

@@ -38,6 +38,7 @@ class DataSave(private val context: Context) {
     fun getNameFile():String{
         return name
     }
+
     fun writeFileExternalStorage(textToWrite:String, filename:String){
         file=File(dir,filename+".txt")
         uri=Uri.fromFile(file)
@@ -50,11 +51,11 @@ class DataSave(private val context: Context) {
         } catch (e: java.lang.Exception) {
             e.printStackTrace()
         }
-
     }
-    fun saveBitmapAsJPEG(bitmap: Bitmap){
+
+    fun saveBitmapAsJPEG(bitmap: Bitmap,filepath:String){
         val filePath: File? = context.getExternalFilesDir(null)
-        val dir:File=File(filePath!!.absolutePath+"/savedImage/")
+        val dir:File=File(filePath!!.absolutePath+filepath)
         dir.mkdir();
         val file:File=File(dir,name+".jpg")
         uri=Uri.fromFile(file)
@@ -62,16 +63,18 @@ class DataSave(private val context: Context) {
         try{
             val outputStream: FileOutputStream =FileOutputStream(file)
             bitmap.compress(Bitmap.CompressFormat.JPEG,100,outputStream)
-            Toast.makeText(context.applicationContext,"Image is Saved on ${file.absoluteFile}",Toast.LENGTH_LONG).show()
+            //Toast.makeText(context.applicationContext,"Image is Saved on ${file.absoluteFile}",Toast.LENGTH_LONG).show()
             outputStream.flush()
             outputStream.close()
         }catch (e: FileNotFoundException){
             e.printStackTrace()
         }
     }
+
     fun getUri():Uri?{
         return this.uri
     }
+
     fun readFile(filename: String) {
         file=File(dir, filename + ".txt")
         try {
@@ -83,10 +86,4 @@ class DataSave(private val context: Context) {
             e.printStackTrace()
         }
     }
-
-
-        //val i=0
-        //Log.d("read_text_test","${String(byteArray)}")
-
-
 }

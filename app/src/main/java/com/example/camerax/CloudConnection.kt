@@ -7,8 +7,11 @@ import android.os.Environment.DIRECTORY_DOWNLOADS
 import android.telephony.mbms.DownloadRequest
 import android.util.Log
 import android.widget.Toast
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleObserver
 import com.google.android.gms.tasks.OnFailureListener
 import com.google.android.gms.tasks.OnSuccessListener
+import com.google.android.gms.tasks.Task
 import com.google.firebase.FirebaseApp
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.ktx.app
@@ -23,76 +26,42 @@ import java.io.File
 import java.lang.Exception
 import java.util.*
 
-class CloudConnection(context: Context) {
-    //var firebaseStorage= Firebase.storage.reference
-    private lateinit var storageReference: StorageReference
-    private lateinit var firebaseStorage: FirebaseStorage
-    private var context=context
+class CloudConnection(private var context:Context) {
 
-    var gsReference=Firebase.storage.getReferenceFromUrl("gs://objectdetection-in-realtime.appspot.com/images/star.png")
-    val ONE_MEGABYTE: Long=1024*1024
-//    fun dosomethings(){
-//        gsReference.getBytes(ONE_MEGABYTE).addOnSuccessListener {
-//            Log.d("download_from_database","SUCCESS")
-//        }
-//            .addOnFailureListener { Log.d("download_from_database","FAIL") }
-//    }
-    fun download() {
-        storageReference=FirebaseStorage.getInstance().reference
-        val ref=storageReference.child("annotation/annotations_images.txt")
-//        ref.downloadUrl.addOnSuccessListener(OnSuccessListener {
-//            fun onSuccess(uri: Uri){
-//                downloadFiles()
-//            }
-//        }).addOnFailureListener(OnFailureListener {
-//            fun onFailure(e:Exception){
-//
-//            }
-//        })
+    private var storageReference=FirebaseStorage.getInstance().reference
+
+    fun download(cloudPath:String, filename:String, destinationDirectory:String): Task<Uri> {
+        //val ref=storageReference.child("annotation/annotations_images.txt")
+        val ref=storageReference.child(cloudPath+filename)
+
         ref.downloadUrl.addOnSuccessListener{
-            downloadfiles("annotations_images",".txt",
-                "/annotations/",it.toString())
-            Toast.makeText(context,"SUCCESS DOWNLOAD",Toast.LENGTH_LONG).show()
+            downloadFile(filename,
+                destinationDirectory,it.toString())
+            Toast.makeText(context,"SUCCESS DOWNLOAD",Toast.LENGTH_SHORT).show()
         }.addOnFailureListener {
 
         }
-
+        return ref.downloadUrl
         }
-    fun downloadfiles(filename:String, fileExtension:String, destinationDirectory:String, url:String){
+    private fun downloadFile(filename:String, destinationDirectory:String, url:String){
         val downloadManager:DownloadManager=context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val uri:Uri=Uri.parse(url)
         val request:DownloadManager.Request=DownloadManager.Request(uri)
         request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-        val file=File(context.getExternalFilesDir(null)!!.absolutePath+"/annotations/","annotations_images.txt")
+        val file=File(context.getExternalFilesDir(null)!!.absolutePath+destinationDirectory,filename)
         if(file.exists())
             file.delete()
-        request.setDestinationInExternalFilesDir(context, destinationDirectory,filename+fileExtension)
+        request.setDestinationInExternalFilesDir(context, destinationDirectory,filename)
         downloadManager.enqueue(request)
     }
-    fun upload(imageUri: Uri, cloudPath:String, filename:String)= CoroutineScope(Dispatchers.IO).launch{
+    fun upload(uri: Uri, cloudPath:String, filename:String)= CoroutineScope(Dispatchers.IO).launch{
 
-        val storageReference=FirebaseStorage.getInstance().reference
-        //val randomKey= UUID.randomUUID().toString()
         val mountainsRef = storageReference.child(cloudPath+filename)
-        mountainsRef.putFile(imageUri).addOnSuccessListener {
-            //pd.dismiss()
-        }.addOnFailureListener {
-            //pd.dismiss()
-        }
-            .addOnProgressListener {
-               // val progressProcent=(100*it.bytesTransferred/it.totalByteCount)
-                //pd.setMessage("Progress: "+progressProcent.toInt() + "%")
-
-            }
+        mountainsRef.putFile(uri)
             .addOnCompleteListener {
-                Toast.makeText(context,"Upload Completed", Toast.LENGTH_LONG).show()
+                Toast.makeText(context,"Upload Completed", Toast.LENGTH_SHORT).show()
             }
-
     }
 
 
-    //val mountainref=storage.child("images/star-883x900.png")
-
-    //Log.d("storage_","${mountainref.path}")
-    //mountainref.getStream()
 }
