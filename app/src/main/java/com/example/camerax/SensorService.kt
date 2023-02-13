@@ -1,23 +1,17 @@
 package com.example.camerax
 
-import android.app.Service
+
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.hardware.camera2.CameraManager
 import android.util.Log
-import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
-
-
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.OnLifecycleEvent
-import java.util.*
 
-class SensorService(private var sensorManager: SensorManager,lifecycle: Lifecycle): LifecycleObserver,SensorEventListener {
+class SensorService(private var sensorManager: SensorManager,lifecycle: Lifecycle, var context: Context): LifecycleObserver,SensorEventListener {
 
     private var mGyroscope: Sensor? = null
     private lateinit var gyroscopeResult:Triple<Float,Float,Float>
@@ -27,7 +21,7 @@ class SensorService(private var sensorManager: SensorManager,lifecycle: Lifecycl
 
     private val rotationMatrix = FloatArray(9)
     private val temp_rotationMatrix = FloatArray(9)
-    private val orientationAngles = FloatArray(3)
+    private var orientationAngles = FloatArray(3)
 
 
     init {
@@ -92,11 +86,7 @@ class SensorService(private var sensorManager: SensorManager,lifecycle: Lifecycl
             magnetometerReading
         )
 
-        // "rotationMatrix" now has up-to-date information.
-
         SensorManager.getOrientation(rotationMatrix, orientationAngles)
-
-        // "orientationAngles" now has up-to-date information.
     }
 
     fun degrees(rad:Float):Double{return rad*180/Math.PI}

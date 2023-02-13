@@ -5,7 +5,13 @@
     <string name="bndboxStrokeWidth">Breite des \nBoundbox-Strichs</string>
     <string name="resultsTextSize">Textgröße der \nErgebnisse</string>
     <string name="maxDetecionsResult">Ergebnis der \nmaximalen \nErkennungen</string>
-    <string name="startAppButton">App Starten</string>
+    <string name="startCameraButton">Camera Starten</string>
+    <string name="startMapButton">Map Starten</string>
     <string name="settingsButton">Einstellungen</string>
     <string name="saveSettingButtonValue">Einstellungen \nspeichern</string>
+    <string name="take_photo">Take Photo</string>
+    <string name="start_capture">Star Capture</string>
+    <string name="stop_capture">Stop Capture</string>
+
+    <string name="title_activity_maps">MapsActivity</string>
 </resources>

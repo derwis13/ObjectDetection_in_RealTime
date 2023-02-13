@@ -18,20 +18,18 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
-class DataSave(private val context: Context) {
+class DataSave(private val context: Context, private val name:String) {
     private lateinit var file:File
     private  var uri: Uri?=null
     val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
-    private var name:String
+    //private val name:String
     private var dir:File
 
     init {
         val filepath=context.getExternalFilesDir(null)
         dir= File(filepath!!.absolutePath+"/annotations/")
         dir.mkdir()
-        //Create a new file that points to the root directory, with the given name:
-        name = SimpleDateFormat(FILENAME_FORMAT, Locale.US)
-            .format(System.currentTimeMillis())
+
         //file= File(dir,name+".txt")
     }
 

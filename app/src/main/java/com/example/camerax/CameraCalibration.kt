@@ -1,6 +1,5 @@
 package com.example.camerax
 
-import android.graphics.ImageFormat
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.RectF
@@ -21,6 +20,9 @@ class CameraCalibration(cameraManager: CameraManager) {
     }
     fun getFocalLength(): Float {
         return focal_length
+    }
+    fun getCameraDimension():Float{
+        return (sensor_dimension.width+sensor_dimension.height)/2
     }
     fun calculateDistanseFromObject(
         objectHeight_mm: Float,

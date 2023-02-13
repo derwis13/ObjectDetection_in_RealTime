@@ -2,11 +2,7 @@
 <layout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools">
-<!--    <data>-->
-<!--        <variable-->
-<!--            name="settingsFragment"-->
-<!--            type="com.example.camerax.SettingsFragment" />-->
-<!--    </data>-->
+
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -37,13 +33,14 @@
                     android:id="@+id/languageTextView"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
+                    android:textColor="@color/purple_500"
                     android:text="@string/language"
                     android:textAlignment="center"
                     android:textSize="25dp" />
 
                 <Spinner
                     android:id="@+id/languageSpinner"
-                    android:layout_width="115dp"
+                    android:layout_width="100dp"
                     android:layout_height="match_parent"
                     android:layout_marginStart="35dp"
                     android:spinnerMode="dropdown" />
@@ -60,6 +57,7 @@
                     android:id="@+id/scoreThresholdTextView"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
+                    android:textColor="@color/purple_500"
                     android:text="@string/scoreThreshold"
                     android:textAlignment="center"
                     android:textSize="25dp" />
@@ -69,8 +67,9 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:layout_marginStart="35dp"
+                    android:textColor="@color/purple_500"
                     android:ems="3"
-                    android:text="0.2"
+                    android:text="0.7"
                     android:inputType="numberDecimal"
                     android:textAlignment="center" />
             </TableRow>
@@ -85,6 +84,7 @@
                     android:id="@+id/strokeWidthTextView"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
+                    android:textColor="@color/purple_500"
                     android:text="@string/bndboxStrokeWidth"
                     android:textAlignment="center"
                     android:textSize="25dp" />
@@ -94,6 +94,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:layout_marginStart="35dp"
+                    android:textColor="@color/purple_500"
                     android:ems="3"
                     android:text="10"
                     android:inputType="numberDecimal"
@@ -110,6 +111,7 @@
                     android:id="@+id/resultTextSizeTextView"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
+                    android:textColor="@color/purple_500"
                     android:text="@string/resultsTextSize"
                     android:textAlignment="center"
                     android:textSize="25dp" />
@@ -119,6 +121,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:layout_marginStart="35dp"
+                    android:textColor="@color/purple_500"
                     android:ems="3"
                     android:text="50"
                     android:inputType="numberDecimal"
@@ -135,6 +138,7 @@
                     android:id="@+id/maxDetectionTextView"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
+                    android:textColor="@color/purple_500"
                     android:text="@string/maxDetecionsResult"
                     android:textAlignment="center"
                     android:textSize="25dp" />
@@ -144,6 +148,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:layout_marginStart="35dp"
+                    android:textColor="@color/purple_500"
                     android:ems="3"
                     android:text="30"
                     android:gravity="center"
@@ -156,6 +161,8 @@
             android:id="@+id/saveSettingButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:textColor="@color/white"
+            app:backgroundTint="@color/purple_500"
             android:layout_marginBottom="24dp"
             android:text="@string/saveSettingButtonValue"
             app:layout_constraintBottom_toBottomOf="@+id/tableLayout"

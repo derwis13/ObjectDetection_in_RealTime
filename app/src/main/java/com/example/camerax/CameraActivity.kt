@@ -5,7 +5,8 @@ import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.hardware.SensorManager
 import android.hardware.camera2.CameraManager
 import android.location.Location
@@ -16,11 +17,8 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
 import android.util.Size
-import android.view.Display
+import android.util.SizeF
 import android.view.View
-import android.view.ViewGroup
-import android.view.WindowManager
-import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
@@ -31,9 +29,10 @@ import androidx.camera.video.VideoCapture
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker
-import androidx.core.graphics.scale
+import com.example.camerax.DataBase.*
 import com.example.camerax.databinding.CameraLayoutBinding
 import com.example.objectdetectionapp.ObjectsDetection
+import kotlinx.coroutines.*
 import org.tensorflow.lite.support.image.TensorImage
 import java.text.SimpleDateFormat
 import java.util.*
@@ -41,23 +40,24 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.collections.ArrayList
 
-class CameraActivity(): AppCompatActivity() {
+class CameraActivity(): AppCompatActivity(){
     private lateinit var objectsDetection: ObjectsDetection
     private lateinit var viewBinding: CameraLayoutBinding
+
     private lateinit var cameraExecutor: ExecutorService
+
     private var imageCapture: ImageCapture? = null
+
+    private val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
     private var photoUri:Uri?=null
-
-    private var dataToSave:ArrayList<String>?=null
-    private var counterFrameOnRecording:Int=0
-
-    private var displaySize:Size= Size(0,0)
 
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
 
-    private var name:String=""
+    private var isPhotoMode=false
 
+    private var name:String=""
 
     private lateinit var locationService:LocationService
     private lateinit var cameraManager: CameraManager
@@ -65,33 +65,15 @@ class CameraActivity(): AppCompatActivity() {
 
     private lateinit var sensorService:SensorService
 
+    private var boundboxStrokeWidth:Float = 0.0f
+    private var textSize:Float = 0.0f
 
+    private var data2Save:ArrayList<ListOfDetectedObjects>?=null
 
-    fun draw():Canvas{
-
-        val canvas=Canvas()
-        val paint = Paint()
-
-        paint.setStyle(Paint.Style.STROKE)
-        paint.setColor(Color.RED)
-        paint.setStrokeWidth(10f)
-
-        //center
-
-        //center
-        val x0 = canvas.width / 2
-        val y0 = canvas.height / 2
-        val dx = canvas.height / 3
-        val dy = canvas.height / 3
-
-        canvas.drawRect((x0-dx).toFloat(), (y0-dy).toFloat(), (x0+dx).toFloat(),
-            (y0+dy).toFloat(), paint)
-
-        return canvas
-    }
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
 
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN
         actionBar?.hide()
@@ -99,52 +81,38 @@ class CameraActivity(): AppCompatActivity() {
         CameraLayoutBinding.inflate(layoutInflater).also { viewBinding=it}
         setContentView(viewBinding.root)
 
-
         locationService=LocationService(applicationContext)
-
-
 
         cameraManager=getSystemService(Context.CAMERA_SERVICE) as CameraManager
 
         sensorManager= getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        sensorService=SensorService(sensorManager,this.lifecycle)
+        sensorService=SensorService(sensorManager,this.lifecycle,this)
 
-
-        if(savedInstanceState==null){
-            //CloudConnection(applicationContext).download("annotation/","annotations_images.txt","/annotations/")
-        }
 
         intent.getFloatArrayExtra("name")?.let {
             objectsDetection= ObjectsDetection(
                 this,
                 it.component1(),
-                it.component2().toInt(),
-                it.component3(),
-                it.component4()
+                it.component2().toInt()
             )
+            boundboxStrokeWidth=it.component3()
+            textSize=it.component4()
         }
 
         if (allPermissionsGranted()) {
-            locationService.requestLocationUpdates()
             startCamera(objectsDetection)
-
-        } else {
+            locationService.requestLocationUpdates()
+        }
+        else {
             ActivityCompat.requestPermissions(
-                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS
-            )
+                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
         }
 
-        viewBinding.imageCaptureButton.setOnClickListener { takePhoto()
-        }
         viewBinding.videoCaptureButton.setOnClickListener {
-            captureVideo()
-//            dataToSave?.let {
-//                it.forEach {
-//                    Log.d("recorded_data","${it}")
-//                }
-//            }
-
-
+            if(isPhotoMode)
+                takePhoto()
+            else
+                captureVideo()
         }
 
         Executors.newSingleThreadExecutor().also {cameraExecutor = it }
@@ -171,6 +139,7 @@ class CameraActivity(): AppCompatActivity() {
             baseContext, it) == PackageManager.PERMISSION_GRANTED
     }
     // Implements VideoCapture use case, including start and stop capturing.
+    @SuppressLint("MissingPermission", "RestrictedApi")
     private fun captureVideo() {
         val videoCapture = this.videoCapture ?: return
 
@@ -217,6 +186,9 @@ class CameraActivity(): AppCompatActivity() {
                             isEnabled = true
                         }
                     }
+                    is VideoRecordEvent.Status ->{
+                        videoCapture.resolutionInfo?.let { onRecordingProcess(it.resolution) }
+                    }
                     is VideoRecordEvent.Finalize -> {
                         if (!recordEvent.hasError()) {
                             val msg = "Video capture succeeded: " +
@@ -224,7 +196,7 @@ class CameraActivity(): AppCompatActivity() {
                             Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT)
                                 .show()
                             Log.d(TAG, msg)
-                            videoCaptureButton(recordEvent.outputResults.outputUri)
+                            videoCaptureButton(recordEvent.outputResults.outputUri,name,"mp4","videos/")
                         } else {
                             recording?.close()
                             recording = null
@@ -246,6 +218,7 @@ class CameraActivity(): AppCompatActivity() {
         val imageCapture = imageCapture ?: return
 
         // Create time stamped name and MediaStore entry.
+
         val name = SimpleDateFormat(FILENAME_FORMAT, Locale.US)
             .format(System.currentTimeMillis())
         val contentValues = ContentValues().apply {
@@ -262,7 +235,6 @@ class CameraActivity(): AppCompatActivity() {
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                 contentValues)
             .build()
-
         // Set up image capture listener, which is triggered after photo has
         // been taken
         imageCapture.takePicture(
@@ -273,124 +245,26 @@ class CameraActivity(): AppCompatActivity() {
                     Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
                 }
 
-                override fun
-                        onImageSaved(output: ImageCapture.OutputFileResults){
+                override fun onImageSaved(output: ImageCapture.OutputFileResults){
                     val msg = "Photo capture succeeded: ${output.savedUri}"
                     Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
                     Log.d(TAG, msg)
                     photoUri=output.savedUri
-                    photoUri?.let {
-                        imageCaptureButton(it)
+
+                    GlobalScope.async {
+                        imageCapture.resolutionInfo?.let { onRecordingProcess(it.resolution) }
+                        delay(1000)
+
+                        photoUri?.let {
+                            videoCaptureButton(it,name,"jpg","images/")
+                        }
+
                     }
+
                 }
             }
         )
-
     }
-
-    @SuppressLint("UnsafeOptInUsageError")
-    private fun startCamera(objectsDetection: ObjectsDetection) {
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
-
-        cameraProviderFuture.addListener({
-            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
-            val preview = Preview.Builder()
-                .build()
-                .also {
-                    it.setSurfaceProvider(viewBinding.viewFinder.surfaceProvider)
-                }
-
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-
-            val recorder = Recorder.Builder()
-                .setQualitySelector(QualitySelector.from(Quality.HIGHEST, FallbackStrategy.higherQualityOrLowerThan(
-                    Quality.SD)))
-                .build()
-
-            imageCapture = ImageCapture.Builder().build()
-            videoCapture = VideoCapture.withOutput(recorder)
-
-
-            val imageAnalysis = ImageAnalysis.Builder()
-                .setOutputImageFormat(OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-                .also { it ->
-                    it.setAnalyzer(cameraExecutor, ImageAnalysis.Analyzer { imageProxy ->
-
-
-                        val rotationDegrees = imageProxy.imageInfo.rotationDegrees
-                        //detect object on image
-                        imageProxy.image?.let { image->
-                            var bitmap=toBitmap(image).let { bitmap->
-                                rotateBitmap(bitmap,rotationDegrees.toFloat())//.scale(viewBinding.viewFinder.width,viewBinding.viewFinder.height)
-                            }
-
-                            try {
-                                TensorImage.fromBitmap(bitmap).also {
-                                    objectsDetection.runObjectDetection(it)
-                                }
-                            }catch(exc: Exception){
-                                Log.e("ObjectDetection","Fail detect objects on image",exc)
-                            }
-
-
-
-                            if(rotationDegrees!=90)
-                                displaySize=Size(viewBinding.viewFinder.height,viewBinding.viewFinder.width)
-                            else
-                                displaySize=Size(viewBinding.viewFinder.width,viewBinding.viewFinder.height)
-
-                            val add_x=-(bitmap.height-image.height)/2
-                            val add_y=-(bitmap.width-image.height)/2
-                            Log.d("value","${image.height} ${image.width}" +
-                                    "${bitmap.height} ${bitmap.width} ${viewBinding.viewFinder.width} ${viewBinding.viewFinder.height}")
-
-
-                            objectsDetection.moveResultBoundBox(add_x.toFloat(),add_y.toFloat())
-
-                            var scale: Float
-                            if(viewBinding.viewFinder.height>viewBinding.viewFinder.width)
-                                scale=viewBinding.viewFinder.height.toFloat() / image.width
-                            else
-                                scale=viewBinding.viewFinder.width.toFloat() / image.width
-
-
-                            objectsDetection.scaleResultBoundBox(scale)
-
-                            val boundedBitmap=objectsDetection.drawBoundingBoxWithText(Size(viewBinding.viewFinder.width,viewBinding.viewFinder.height))
-
-
-                            if(recording!=null)
-                            {
-                                counterFrameOnRecording++
-                                collectData()
-                            }
-
-                            //on Click button
-                            //viewBinding.imageCaptureButton.setOnClickListener { imageCaptureButton(boundedBitmap,bitmap)}
-
-                            sensorService.updateOrientationAngles()
-
-
-
-                            this@CameraActivity.runOnUiThread(Runnable {
-                                this.viewBinding.imageView.setImageBitmap(boundedBitmap)
-                            })
-                            }
-                        imageProxy.close()
-                    })
-                }
-
-            try {
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(this, cameraSelector,imageAnalysis,imageCapture,preview)
-            } catch(exc: Exception) {
-                Log.e(CameraActivity.TAG, "Use case binding failed", exc)
-            }
-        }, ContextCompat.getMainExecutor(this))
-    }
-
     fun toBitmap(image: Image): Bitmap {
         val planes = image.planes
         val buffer = planes[0].buffer
@@ -410,248 +284,259 @@ class CameraActivity(): AppCompatActivity() {
         return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
     }
 
+    @SuppressLint("UnsafeOptInUsageError")
+    private fun startCamera(objectsDetection: ObjectsDetection) {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
-    @SuppressLint("MissingPermission")
-    fun imageCaptureButton(boundedBitmap: Bitmap,bitmap: Bitmap){
-
-        val dataSave= DataSave(applicationContext)
-
-        annotationsUploadProcess(bitmap,dataSave)
-
-        //upload bounded image
-        imageUploadProcess(boundedBitmap,dataSave,"/bounded_images/","bounded_images/")
-
-        //upload image
-        imageUploadProcess(bitmap,dataSave,"/saved_images/","images/")
-
-    }
-    fun imageCaptureButton(uri:Uri){
-
-        val dataSave= DataSave(applicationContext)
-
-        annotationsUploadProcess(uri,dataSave)
-
-        //upload image
-        imageUploadProcess(uri,dataSave,"images/")
-
-    }
-    fun videoCaptureButton(uri:Uri){
-        val dataSave= DataSave(applicationContext)
-        var text=""
-        dataToSave?.let {
-            it.forEach {
-                text+=it
+        cameraProviderFuture.addListener({
+            val cameraProvider = cameraProviderFuture.get()
+            val preview = Preview.Builder()
+                .build()
+                .also {
+                    it.setSurfaceProvider(viewBinding.viewFinder.surfaceProvider)
                 }
+
+
+            val recorder = Recorder.Builder()
+                .setQualitySelector(QualitySelector.from(Quality.HIGHEST, FallbackStrategy.higherQualityOrLowerThan(
+                    Quality.SD)))
+                .build()
+
+            imageCapture = ImageCapture.Builder()
+                .build()
+            videoCapture = VideoCapture.withOutput(recorder)
+
+
+
+            val imageAnalysis = ImageAnalysis.Builder()
+                .setOutputImageFormat(OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+                .also {
+                    it.setAnalyzer(cameraExecutor, ImageAnalysis.Analyzer { image ->
+                        val rotationDegrees = image.imageInfo.rotationDegrees
+
+                        //detect object on image
+                        image.image?.let { it ->
+                            val bitmap = toBitmap(it).let { bitmap ->
+                                rotateBitmap(
+                                    bitmap,
+                                    rotationDegrees.toFloat()
+                                )
+                            }
+
+                            try {
+                                TensorImage.fromBitmap(bitmap).also {
+                                    objectsDetection.runObjectDetection(it)
+                                }
+                            } catch (exc: Exception) {
+                                Log.e("ObjectDetection", "Fail detect objects on image", exc)
+                            }
+
+
+                            val boundingBox=BoundingBox(objectsDetection.getResults(),applicationContext).also {
+                                val add_x = -(bitmap.height - image.height) / 2
+                                val add_y = -(bitmap.width - image.height) / 2
+                                it.moveResultBoundBox(add_x.toFloat(),add_y.toFloat())
+                                it.setTargetImageResolution(Size(viewBinding.viewFinder.width,viewBinding.viewFinder.height))
+                                it.setScale(
+                                    SizeF(it.getTargetImageResolution()!!.width.toFloat()/objectsDetection.getTargetImageResolution()!!.width,
+                                        it.getTargetImageResolution()!!.height.toFloat()/objectsDetection.getTargetImageResolution()!!.height))
+                                if(it.getScale().width>it.getScale().height)
+                                    it.scaleResultBoundBox(it.getScale().width)
+                                else
+                                    it.scaleResultBoundBox(it.getScale().height)
+                            }
+                            val boundedBitmap=boundingBox.drawBoundingBoxWithText(boundboxStrokeWidth,textSize)
+                            objectsDetection.setRotationDegrees(rotationDegrees)
+
+
+
+                            sensorService.updateOrientationAngles()
+
+                            this@CameraActivity.runOnUiThread(Runnable {
+                                this.viewBinding.imageView.setImageBitmap(boundedBitmap)
+                            })
+
+                        }
+
+                        image.close()
+                    })
+                }
+
+            try {
+                cameraProvider.unbindAll()
+                cameraProvider.bindToLifecycle(this, cameraSelector,imageAnalysis,videoCapture,preview)
+            } catch(exc: Exception) {
+                Log.e(CameraActivity.TAG, "Use case binding failed", exc)
             }
-        dataSave.writeFileExternalStorage(text,"annotations_videos")
-        dataSave.getUri()?.let {
-            CloudConnection(applicationContext).upload(it,"annotation/","annotations_videos.txt")
-        }
-        imageUploadProcess(uri,dataSave,"videos/")
 
-            //upload image
-            //imageUploadProcess(uri,dataSave,"images/")
-
-    }
-
-    fun collectData(){
-        val dataSave= DataSave(applicationContext)
-        locationService.getLastLocation()
-            .addOnSuccessListener { location: Location ->
-                for (i in 0 until objectsDetection.getCountOfResults()) {
-                    val result=objectsDetection.getResult(i)
-                    var sing_size=600f
-                    if(result.categories[0].index==1)
-                        sing_size=800f
-                    if (result.categories[0].index==2)
-                        sing_size=600f
-                    if (result.categories[0].index==3)
-                        sing_size=800f
-
-                    val dist=CameraCalibration(cameraManager).calculateDistanseFromObject(
-                        sing_size,
-                        result.boundingBox.bottom-result.boundingBox.top,
-                        displaySize.height)
-
-                    val scale=CameraCalibration(cameraManager).calculateScale(
-                        sing_size,
-                        result.boundingBox.bottom-result.boundingBox.top
-                    )
-
-                    val angle=CameraCalibration(cameraManager).calculateAngleFromCameraCenter(
-                        Size(displaySize.width,displaySize.height),
-                        result.boundingBox,dist,scale)
-
-                    //Toast.makeText(applicationContext,"${angle[0]}, ${angle[1]}, $dist",Toast.LENGTH_SHORT).show()
-
-
-                    if(dataToSave==null){
-                        dataToSave= arrayListOf("${name}.mp4;"+
-                                "$counterFrameOnRecording;"+
-                                "${result.boundingBox.left};"+
-                                "${result.boundingBox.top};"+
-                                "${result.boundingBox.right};"+
-                                "${result.boundingBox.bottom};"+
-                                "${result.categories.first().index};"+
-                                "${result.categories.first().score};"+
-                                "${location.latitude};"+
-                                "${location.longitude};"+
-                                "${location.altitude};"+
-                                "${sensorService.getSensorResult()[0]};"+
-                                "${sensorService.getSensorResult()[1]};"+
-                                "${sensorService.getSensorResult()[2]};"+
-                                "${dist};"+
-                                "${angle[0]};"+
-                                "${angle[1]}\n")
+            viewBinding.button.setOnClickListener {
+                isPhotoMode = !isPhotoMode
+                if (isPhotoMode) {
+                    viewBinding.videoCaptureButton.setText(R.string.take_photo)
+                    viewBinding.button.setText("video")
+                    try {
+                        cameraProvider.unbind(videoCapture)
+                        cameraProvider.bindToLifecycle(this, cameraSelector,imageAnalysis,imageCapture,preview)
+                    } catch(exc: Exception) {
+                        Log.e(CameraActivity.TAG, "Use case binding failed", exc)
                     }
-                    else{
-                        dataToSave!!.add("${name}.mp4;"+
-                                "$counterFrameOnRecording;"+
-                                "${result.boundingBox.left};"+
-                                "${result.boundingBox.top};"+
-                                "${result.boundingBox.right};"+
-                                "${result.boundingBox.bottom};"+
-                                "${result.categories.first().index};"+
-                                "${result.categories.first().score};"+
-                                "${location.latitude};"+
-                                "${location.longitude};"+
-                                "${location.altitude};"+
-                                "${sensorService.getSensorResult()[0]};"+
-                                "${sensorService.getSensorResult()[1]};"+
-                                "${sensorService.getSensorResult()[2]};"+
-                                "${dist};"+
-                                "${angle[0]};"+
-                                "${angle[1]}\n")
+
+                } else{
+                    viewBinding.videoCaptureButton.setText(R.string.start_capture)
+                    viewBinding.button.setText("photo")
+                    try {
+                        cameraProvider.unbind(imageCapture)
+                        cameraProvider.bindToLifecycle(this, cameraSelector,imageAnalysis,videoCapture,preview)
+                    } catch(exc: Exception) {
+                        Log.e(CameraActivity.TAG, "Use case binding failed", exc)
+                    }
+
+                }
+            }
+
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+
+
+    fun videoCaptureButton(uri:Uri, name:String, extension:String, pathToSave:String){
+
+        CloudConnection(applicationContext).upload(uri,pathToSave,name+"."+extension)
+
+        data2Save?.let{
+            FirebaseDataBase(this).writeNewMediaData(MediaData(extension,it),name)
+        }
+        data2Save=null
+
+
+    }
+
+    fun onRecordingProcess(resolution:Size) {
+
+
+        val boundingbox=BoundingBox(objectsDetection.getResults(), applicationContext).also {
+
+            if(objectsDetection.getRotationDegrees()!=90)
+                it.setTargetImageResolution(resolution)
+            else
+                it.setTargetImageResolution(Size(resolution.height,resolution.width))
+
+
+
+            it.setScale(SizeF(
+                it.getTargetImageResolution()!!.width.toFloat()/objectsDetection.getTargetImageResolution()!!.width,
+                it.getTargetImageResolution()!!.height.toFloat()/objectsDetection.getTargetImageResolution()!!.height))
+            if(it.getScale().width!=it.getScale().height) {
+                val add_y =
+                    -(objectsDetection.getTargetImageResolution()!!.height - objectsDetection.getTargetImageResolution()!!.height) / 2
+                val add_x =
+                    -(objectsDetection.getTargetImageResolution()!!.height - objectsDetection.getTargetImageResolution()!!.width) / 2
+                it.moveResultBoundBox(add_x.toFloat(), add_y.toFloat())
+            }
+            if(it.getScale().width>it.getScale().height)
+                it.scaleResultBoundBox(it.getScale().width)
+            else
+                it.scaleResultBoundBox(it.getScale().height)
+
+        }
+
+        locationService.getLastLocation()
+            .addOnSuccessListener { location: Location ->
+                var listOfDetectedObject: ArrayList<DetectedObject>?=null
+                val listOfDeviceLocation = ListOfDeviceLocation(
+                    location.altitude,
+                    location.latitude,
+                    location.longitude,
+                    location.accuracy.toDouble()
+                )
+
+                val listOfDeviceRotation = ListOfDeviceRotation(
+                    sensorService.getSensorResult()[0],
+                    sensorService.getSensorResult()[1],
+                    sensorService.getSensorResult()[2]
+                )
+
+                for (i in 0 until objectsDetection.getCountOfResults()) {
+                    val result=boundingbox.getBoundingBox(i)
+
+                    result?.let {
+                        var sign_size = 600f
+                        if (result.categories[0].index == 1)
+                            sign_size = 800f
+                        if (result.categories[0].index == 2)
+                            sign_size = 600f
+                        if (result.categories[0].index == 3)
+                            sign_size = 600f
+
+                        val dist = CameraCalibration(cameraManager).calculateDistanseFromObject(
+                            sign_size,
+                            result.boundingBox.bottom - result.boundingBox.top,
+                            boundingbox.getTargetImageResolution()!!.height
+                        )
+
+                        val scale = CameraCalibration(cameraManager).calculateScale(
+                            sign_size,
+                            result.boundingBox.bottom - result.boundingBox.top
+                        )
+
+                        val angle = CameraCalibration(cameraManager).calculateAngleFromCameraCenter(
+                            Size(
+                                boundingbox.getTargetImageResolution()!!.width,
+                                boundingbox.getTargetImageResolution()!!.height
+                                 ),
+                            result.boundingBox,
+                            dist,
+                            scale
+                        )
+
+                        if(listOfDetectedObject==null)
+                            listOfDetectedObject = arrayListOf(
+                                DetectedObject(
+                                    "${result.categories[0].label}",
+                                    "${result.categories[0].index}",
+                                    result.categories[0].score,
+                                    dist,
+                                    angle[0],
+                                    angle[1],
+                                    sign_size,
+                                    boundingbox.getBoundingBox(i)!!.boundingBox
+                                )
+                            )
+                        else
+                            listOfDetectedObject!!.add(
+                                DetectedObject(
+                                    "${result.categories[0].label}",
+                                    "${result.categories[0].index}",
+                                    result.categories[0].score,
+                                    dist,
+                                    angle[0],
+                                    angle[1],
+                                    sign_size,
+                                    boundingbox.getBoundingBox(i)!!.boundingBox
+                                )
+                            )
                     }
                 }
+
+                if(data2Save==null){
+                    data2Save= arrayListOf(ListOfDetectedObjects(
+                        listOfDetectedObject,
+                        listOfDeviceLocation,
+                        listOfDeviceRotation))
+                }
+                else
+                    data2Save!!.add(ListOfDetectedObjects(
+                        listOfDetectedObject,
+                        listOfDeviceLocation,
+                        listOfDeviceRotation
+                    ))
             }
-
-    }
-
-    fun annotationsUploadProcess(bitmap: Bitmap, dataSave: DataSave){
-
-        //get location of device with 0.01m precision [7 decimal places]
-        locationService.getLastLocation()
-            .addOnSuccessListener { location: Location ->
-
-                for (i in 0 until objectsDetection.getCountOfResults()) {
-                    val result=objectsDetection.getResult(i)
-
-                    val dist=CameraCalibration(cameraManager).calculateDistanseFromObject(
-                        265f,
-                        result.boundingBox.bottom-result.boundingBox.top,
-                        bitmap.height)
-
-                    val scale=CameraCalibration(cameraManager).calculateScale(
-                        265f,
-                        result.boundingBox.bottom-result.boundingBox.top
-                    )
-
-
-                    val angle=CameraCalibration(cameraManager).calculateAngleFromCameraCenter(
-                        Size(bitmap.width,bitmap.height),
-                        result.boundingBox,dist,scale)
-
-                    //Toast.makeText(applicationContext,"${angle[0]}, ${angle[1]}, $dist",Toast.LENGTH_SHORT).show()
-
-
-                    dataSave.writeFileExternalStorage(
-                        "${dataSave.getNameFile()}.jpg;"+
-                                "${result.boundingBox.left};"+
-                                "${result.boundingBox.top};"+
-                                "${result.boundingBox.right};"+
-                                "${result.boundingBox.bottom};"+
-                                "${result.categories.first().index};"+
-                                "${result.categories.first().score};"+
-                                "${location.latitude};"+
-                                "${location.longitude};"+
-                                "${location.altitude};"+
-                                "${sensorService.getSensorResult()[0]};"+
-                                "${sensorService.getSensorResult()[1]};"+
-                                "${sensorService.getSensorResult()[2]};"+
-                                "${dist};"+
-                                "${angle[0]};"+
-                                "${angle[1]}\n",
-                        "annotations_images")
-                }
-                //upload annotation
-                dataSave.getUri()?.let {
-                    CloudConnection(applicationContext).upload(it,"annotation/","annotations_images.txt")
-                }
-            }
-
-    }
-    fun annotationsUploadProcess(uri:Uri, dataSave: DataSave){
-
-        //get location of device with 0.01m precision [7 decimal places]
-        locationService.getLastLocation()
-            .addOnSuccessListener { location: Location ->
-
-                for (i in 0 until objectsDetection.getCountOfResults()) {
-                    val result=objectsDetection.getResult(i)
-
-                    val dist=CameraCalibration(cameraManager).calculateDistanseFromObject(
-                        265f,
-                        result.boundingBox.bottom-result.boundingBox.top,
-                        displaySize.height)
-
-                    val scale=CameraCalibration(cameraManager).calculateScale(
-                        265f,
-                        result.boundingBox.bottom-result.boundingBox.top
-                    )
-
-
-                    val angle=CameraCalibration(cameraManager).calculateAngleFromCameraCenter(
-                        Size(displaySize.width,displaySize.height),
-                        result.boundingBox,dist,scale)
-
-                    //Toast.makeText(applicationContext,"${angle[0]}, ${angle[1]}, $dist",Toast.LENGTH_SHORT).show()
-
-
-
-                    dataSave.writeFileExternalStorage(
-                        "${dataSave.getNameFile()}.jpg;"+
-                                "${result.boundingBox.left};"+
-                                "${result.boundingBox.top};"+
-                                "${result.boundingBox.right};"+
-                                "${result.boundingBox.bottom};"+
-                                "${result.categories.first().index};"+
-                                "${result.categories.first().score};"+
-                                "${location.latitude};"+
-                                "${location.longitude};"+
-                                "${location.altitude};"+
-                                "${sensorService.getSensorResult()[0]};"+
-                                "${sensorService.getSensorResult()[1]};"+
-                                "${sensorService.getSensorResult()[2]};"+
-                                "${dist};"+
-                                "${angle[0]};"+
-                                "${angle[1]}\n",
-                        "annotations_images")
-                }
-                //upload annotation
-                dataSave.getUri()?.let {
-                    CloudConnection(applicationContext).upload(it,"annotation/","annotations_images.txt")
-                }
-            }
-
-    }
-    fun imageUploadProcess(bitmap: Bitmap,dataSave: DataSave, devicePath:String, cloudPath:String){
-
-        //save bitmap to device store
-        dataSave.saveBitmapAsJPEG(bitmap,devicePath)
-
-        //get uri saved bitmap on device
-        dataSave.getUri()?.let {
-            //upload bitmap to cloud
-            CloudConnection(applicationContext).upload(
-                it, cloudPath, dataSave.getNameFile())
-        }
-    }
-    fun imageUploadProcess(uri:Uri,dataSave: DataSave,cloudPath:String){
-        CloudConnection(applicationContext).upload(uri,cloudPath,dataSave.getNameFile())
     }
 
     override fun onResume() {
+        locationService.requestLocationUpdates()
         super.onResume()
     }
     override fun onPause() {
@@ -679,4 +564,6 @@ class CameraActivity(): AppCompatActivity() {
                 }
             }.toTypedArray()
     }
+
+
 }

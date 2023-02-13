@@ -3,35 +3,20 @@ package com.example.camerax
 import android.app.DownloadManager
 import android.content.Context
 import android.net.Uri
-import android.os.Environment.DIRECTORY_DOWNLOADS
-import android.telephony.mbms.DownloadRequest
-import android.util.Log
 import android.widget.Toast
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleObserver
-import com.google.android.gms.tasks.OnFailureListener
-import com.google.android.gms.tasks.OnSuccessListener
 import com.google.android.gms.tasks.Task
-import com.google.firebase.FirebaseApp
-import com.google.firebase.ktx.Firebase
-import com.google.firebase.ktx.app
 import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.StorageReference
-import com.google.firebase.storage.ktx.storage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.io.File
-import java.lang.Exception
-import java.util.*
+
 
 class CloudConnection(private var context:Context) {
 
     private var storageReference=FirebaseStorage.getInstance().reference
 
     fun download(cloudPath:String, filename:String, destinationDirectory:String): Task<Uri> {
-        //val ref=storageReference.child("annotation/annotations_images.txt")
         val ref=storageReference.child(cloudPath+filename)
 
         ref.downloadUrl.addOnSuccessListener{

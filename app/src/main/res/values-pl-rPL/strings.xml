@@ -5,7 +5,13 @@
     <string name="bndboxStrokeWidth">Szarokość obrysu \nobramowania</string>
     <string name="resultsTextSize">Rozmiar wyniku</string>
     <string name="maxDetecionsResult">Max ilość \nwyników detekcji</string>
-    <string name="startAppButton">Start</string>
+    <string name="startCameraButton">Start</string>
+    <string name="startMapButton">Start Map</string>
     <string name="settingsButton">Ustawienia</string>
     <string name="saveSettingButtonValue">Zapisz ustawienia</string>
+    <string name="take_photo">Zrób zdjęcie</string>
+    <string name="start_capture">Rozpocznij nagrywanie</string>
+    <string name="stop_capture">Zatrzymaj nagrywanie</string>
+
+    <string name="title_activity_maps">MapsActivity</string>
 </resources>

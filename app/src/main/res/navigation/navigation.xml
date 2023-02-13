@@ -16,6 +16,9 @@
         <action
             android:id="@+id/action_titleFragment_to_cameraActivity"
             app:destination="@id/cameraActivity" />
+        <action
+            android:id="@+id/action_titleFragment_to_mapsActivity"
+            app:destination="@id/mapsActivity" />
     </fragment>
     <fragment
         android:id="@+id/settingsFragment"
@@ -31,4 +34,9 @@
         android:name="com.example.camerax.CameraActivity"
         android:label="CameraActivity"
         tools:layout="@layout/camera_layout"/>
+    <activity
+        android:id="@+id/mapsActivity"
+        android:name="com.example.camerax.MapsActivity"
+        android:label="MapsActivity"
+        tools:layout="@layout/activity_map"/>
 </navigation>

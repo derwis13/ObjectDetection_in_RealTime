@@ -17,7 +17,7 @@ class TitleFragment : Fragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?): View? {
         FragmentTitleBinding.inflate(layoutInflater).also { binding=it}
-        binding.startAppButton.setOnClickListener {
+        binding.startCameraButton.setOnClickListener {
             val intent = Intent(this.requireContext(), CameraActivity::class.java)
             intent.putExtra("name", floatArrayOf(0.2f,30f,10f,50f))
             startActivity(intent)
@@ -25,6 +25,9 @@ class TitleFragment : Fragment() {
         binding.settingsButton.setOnClickListener{
                 view:View ->view.findNavController()
             .navigate(R.id.action_titleFragment_to_settingsFragment)}
+        binding.startMapButton.setOnClickListener{
+                view:View ->view.findNavController()
+            .navigate(R.id.action_titleFragment_to_mapsActivity)}
 
         return binding.root
     }
